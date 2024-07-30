@@ -1,4 +1,4 @@
-module github.com/hongshengjie/crud
+module github.com/fighthorse/crud
 
 go 1.16
 

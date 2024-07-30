@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
@@ -17,11 +18,14 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/hongshengjie/crud/internal/model"
+	"github.com/fighthorse/crud/internal/model"
 )
 
 //go:embed "internal/templates/model.tmpl"
 var modelTmpl []byte
+
+//go:embed "internal/templates/custom.tmpl"
+var customTmpl []byte
 
 //go:embed "internal/templates/builder.tmpl"
 var crudTmpl []byte
@@ -66,7 +70,7 @@ func init() {
 	flag.BoolVar(&reactgrommet, "reactgrommet", false, "-reactgrommet  generate reactgrommet tsx code work with -service")
 	flag.StringVar(&protopkg, "protopkg", "", "-protopkg  proto package field value")
 	flag.StringVar(&mgo, "mgo", "", "-mgo find struct from file and generate crud method example  ./user.go:User  User struct in ./user.go file ")
-	flag.StringVar(&struct2pb, "struct2pb", "", "-struct2pb find struct from file and generate corresponding proto message  ./user.go:User  User struct in ./user.go file ")
+	flag.StringVar(&path, "path", "", "-path find sql file")
 }
 
 func main() {
@@ -132,12 +136,14 @@ func main() {
 	if path == "" {
 		path = defaultDir
 	}
+	fmt.Println("Start to build:", path)
 	tableObjs, isDir := tableFromSql(path)
 	for _, v := range tableObjs {
+		fmt.Println("====> ", v.TableName)
 		generateFiles(v)
 	}
 	if isDir && path == defaultDir {
-		generateFile(filepath.Join(defaultDir, "aa_client.go"), string(clientTmpl), f, tableObjs)
+		generateFile(filepath.Join(defaultDir, "client.go"), string(clientTmpl), f, tableObjs)
 	}
 
 }
@@ -150,24 +156,36 @@ func tableFromSql(path string) (tableObjs []*model.Table, isDir bool) {
 	}
 	if info.IsDir() {
 		isDir = true
-		fs, err := ioutil.ReadDir(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, v := range fs {
-			if !v.IsDir() && strings.HasSuffix(strings.ToLower(v.Name()), ".sql") {
-				obj := model.MysqlTable(database, filepath.Join(path, v.Name()), relativePath)
-				if obj != nil {
-					tableObjs = append(tableObjs, obj)
-				}
-
-			}
-
+		ll := readDirSql(path, relativePath)
+		if len(ll) > 0 {
+			tableObjs = append(tableObjs, ll...)
 		}
 	} else {
 		tableObjs = append(tableObjs, model.MysqlTable(database, path, relativePath))
 	}
 	return tableObjs, isDir
+}
+
+func readDirSql(path, relativePath string) (tableObjs []*model.Table) {
+	fs, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, v := range fs {
+		if v.IsDir() {
+			res := readDirSql(path+"/"+v.Name(), relativePath)
+			if len(res) > 0 {
+				tableObjs = append(tableObjs, res...)
+			}
+		}
+		if !v.IsDir() && strings.HasSuffix(strings.ToLower(v.Name()), ".sql") {
+			obj := model.MysqlTable(database, filepath.Join(path, v.Name()), relativePath)
+			if obj != nil {
+				tableObjs = append(tableObjs, obj)
+			}
+		}
+	}
+	return
 }
 
 var f = template.FuncMap{
@@ -178,10 +196,27 @@ var f = template.FuncMap{
 }
 
 func generateFiles(tableObj *model.Table) {
-
 	//创建目录
 	dir := filepath.Join(defaultDir, tableObj.PackageName)
-	os.Mkdir(dir, os.ModePerm)
+	//判断文件是否存在 不存在进行创建
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(dir, os.ModePerm)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	} else if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	customFilePath := filepath.Join(dir, "custom.go")
+	// 使用 os.Stat 获取文件状态
+	_, errE := os.Stat(customFilePath)
+	if os.IsNotExist(errE) {
+		generateFile(customFilePath, string(customTmpl), f, tableObj)
+	}
 	generateFile(filepath.Join(dir, "model.go"), string(modelTmpl), f, tableObj)
 	generateFile(filepath.Join(dir, "where.go"), string(whereTmpl), f, tableObj)
 	generateFile(filepath.Join(dir, "builder.go"), string(crudTmpl), f, tableObj)

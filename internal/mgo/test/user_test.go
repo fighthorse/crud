@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hongshengjie/crud/mgo"
+	"github.com/fighthorse/crud/mgo"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
