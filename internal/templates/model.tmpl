@@ -12,7 +12,7 @@ import (
 // {{.GoTableName}} represents a row from '{{.TableName}}'.
 type {{.GoTableName}} struct {
 	{{- range .Fields }}
-    	{{ .GoColumnName }} {{  .GoColumnType }} `json:"{{ .ColumnName }}" gorm:"{{ .ColumnName }}" form:"{{ .ColumnName }}"` // {{ .ColumnComment }}
+		{{ .GoColumnName }} {{  .GoColumnType }}  `json:"{{ .ColumnName }}" gorm:"column:{{ .ColumnName }}" form:"{{ .ColumnName }}"` // {{ .ColumnComment }}
     {{- end}}
 }
 
