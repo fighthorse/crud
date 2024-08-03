@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -113,7 +114,8 @@ func MysqlTable(db, path, relative string) *Table {
 	}
 	stmt, err := sqlparser.ParseStrictDDL(trimTimeStampFunc(string(sql)))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("MysqlTable:", path, string(sql))
+		fmt.Println("Error:", err)
 	}
 	ddl, ok := stmt.(*sqlparser.DDL)
 	if !ok {
